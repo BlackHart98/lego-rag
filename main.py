@@ -7,18 +7,20 @@ from pydantic import BaseModel
 from langchain.text_splitter import MarkdownHeaderTextSplitter
 from dataclasses import dataclass
 from utils import SplitResult, FileMeta, AIModel
+from config import Config
 import random
 
 from langchain_mistralai import MistralAIEmbeddings
 
 import hashlib
-# from core import *
     
 class RAGModel:
-    def __init__(self, model_id:str) -> None:
+    def __init__(self, model_id: str, api_key: str=Config.MISTRAL_API_KEY) -> None:
+        print(Config.MISTRAL_API_KEY)
         ai_model = AIModel(model_id).model
         self._embeddings = MistralAIEmbeddings(
             model=ai_model.embedding_model,
+            api_key=api_key,
         )
         
     async def get_mdfile_embeddings(
@@ -63,7 +65,7 @@ class RAGModel:
             file_path=chunk.file_path, 
             file_check_sum=chunk.file_check_sum,
             split_check_sum=chunk.split_check_sum,
-            embedding=None,
+            embedding=self._embeddings.embed_query(chunk.md_header_split.page_content),
             md_header_split=chunk.md_header_split
         )
 

@@ -8,7 +8,7 @@ class SplitResult:
     file_path: str
     file_check_sum: str
     split_check_sum: str
-    md_header_split: t.Any
+    md_header_split: t.List[float]
     embedding: t.Any | None = None
  
  
