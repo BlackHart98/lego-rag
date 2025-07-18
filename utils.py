@@ -8,7 +8,7 @@ class SplitResult:
     file_path: str
     file_check_sum: str
     split_check_sum: str
-    md_header_split: t.List[float]
+    md_header_split: t.Any
     embedding: t.Any | None = None
  
  
@@ -17,6 +17,15 @@ class FileMeta:
     file_path: str
     split_count: int
     split_results: t.List[SplitResult]
+    
+    
+@dataclass
+class FileMetaV2:
+    file_path: str
+    split_count: int
+    split_results: t.List[SplitResult]
+    
+    
     
 @dataclass    
 class MistralModel:
@@ -30,7 +39,7 @@ class AIModel:
     def __init__(self, model_id: str):
         match model_id:
             case MistralModel.model_id:
-                 self.model = MistralModel()
+                 self.model = MistralModel
             case _:
                 raise ValueError("Unsupported model id")
                 
