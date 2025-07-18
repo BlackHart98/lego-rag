@@ -6,5 +6,5 @@
 
 
 > [!Note]
-> For now the primary vector database is Chroma
-> Still an active work in progress
+> - For now the primary vector database is Chroma
+> - Still an active work in progress
