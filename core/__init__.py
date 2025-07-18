@@ -1,18 +1,9 @@
 import os
 import sys
-import asyncio
 import typing as t
-from dotenv import load_dotenv, find_dotenv
 from pydantic import BaseModel
-from langchain.text_splitter import MarkdownHeaderTextSplitter
-from dataclasses import dataclass
-from utils import SplitResult, FileMeta, AIModel, FileMetaV2
-from config import Config, vector_store
-import random
+from config import vector_store
 
-from langchain_mistralai import MistralAIEmbeddings
-
-import hashlib
  
 import chromadb
 from langchain_core.documents import Document
@@ -32,7 +23,7 @@ class RAGModel:
         text_spliter:TextLoader=RecursiveCharacterTextSplitter(
             chunk_size=200, 
             chunk_overlap=0),
-        vector_store=chromadb.Client(),
+        vector_store=vector_store,
     ):
         self._text_split = text_spliter
         self._collection = vector_store.get_or_create_collection(name=model_id)
