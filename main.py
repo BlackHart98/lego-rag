@@ -2,11 +2,11 @@ import sys
 import asyncio
 import typing as t
 
-from core import RAGModel, Questionaire
+from core import RAGModel, Questionnaire
         
     
 async def main(argv: t.List[str]) -> int:
-    query = Questionaire(query="what is my core algorithm?").\
+    query = Questionnaire(query="what is my core algorithm?").\
         generate_retrival_query().\
             get_query_splits()
     

@@ -86,7 +86,7 @@ class RAGModel:
         return self._collection.query(**kwargs)
     
     
-class Questionaire(BaseModel):
+class Questionnaire(BaseModel):
     query: str
     query_strategy: QueryStrategy = QueryStrategy.BASIC_STRATEGY
     query_split_count: int = 0
