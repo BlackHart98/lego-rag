@@ -4,8 +4,6 @@ import typing as t
 
 from core import RAGModel, Questionaire
         
-
-
     
 async def main(argv: t.List[str]) -> int:
     query_result: RAGModel = RAGModel().\
