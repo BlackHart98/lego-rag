@@ -6,14 +6,14 @@ from core import RAGModel, Questionnaire
 from utils import QueryStrategy        
     
 async def main(argv: t.List[str]) -> int:
-    query: Questionnaire = Questionnaire(
+    query: t.List[str] = Questionnaire(
         query="what is my core algorithm?", 
         query_strategy=QueryStrategy.STEP_BACK_STRATEGY, 
         query_split_count=1).\
         generate_retrival_query().\
             get_query_splits()
     
-    query_result: RAGModel = RAGModel().\
+    query_result = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
                 store_embedding().\
