@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from langchain.text_splitter import MarkdownHeaderTextSplitter
 from dataclasses import dataclass
 from utils import SplitResult, FileMeta, AIModel, FileMetaV2
-from config import Config
+from config import Config, vector_store
 import random
 
 from langchain_mistralai import MistralAIEmbeddings
@@ -32,7 +32,6 @@ class RAGModel:
         vector_store=chromadb.Client(),
     ):
         self._text_split = text_spliter
-        self._vector_store = vector_store
         self._collection = vector_store.get_or_create_collection(name=model_id)
     
     
@@ -63,7 +62,6 @@ class RAGModel:
         return self
     
 
-
     def store_embedding(self, id_prefix="id"):
         self._collection.upsert(
             documents=[item.page_content for item in self._documents_splits],
@@ -74,23 +72,21 @@ class RAGModel:
         
     def query_collection(self, **kwargs) -> chromadb.QueryResult:
         return self._collection.query(**kwargs)
-    
+ 
+ 
+def filter_threshold(c: chromadb.QueryResult, threshold: float=0.7) -> chromadb.QueryResult:
+    return c
     
 async def main(argv: t.List[str]) -> int:
-    foobar: RAGModel = RAGModel().\
+    query_result: RAGModel = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
-                store_embedding()
-    
-    results = foobar.query_collection(
-        query_texts=["what is my core algorithm?"], # Chroma will embed this for you
-        n_results=1 # how many results to return
-    )
+                store_embedding().\
+                    query_collection(query_texts=["what is my core algorithm?",], n_results=1,)
 
-    print(results)
+    print(query_result)
     return 0
 
 
 if __name__ == "__main__":
     asyncio.run(main(sys.argv))
-    pass
