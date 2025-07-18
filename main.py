@@ -6,17 +6,17 @@ from core import RAGModel, Questionaire
         
     
 async def main(argv: t.List[str]) -> int:
+    query = Questionaire(query="what is my core algorithm?").\
+        generate_retrival_query().\
+            get_query_splits()
+    
     query_result: RAGModel = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
                 store_embedding().\
-                    query_collection(query_texts=["what is my core algorithm?",], n_results=1,)
+                    query_collection(query_texts=query, n_results=1,)
     print(query_result)
     
-    sample_questionaire = Questionaire(query="what is my core algorithm?").\
-        generate_retrival_query().\
-            get_query_splits()
-    print(sample_questionaire)
     return 0
 
 
