@@ -19,6 +19,8 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders.text import TextLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter
 
+import zipfile
+
 
 class RAGModel:
     _documents: t.List[t.List[Document]] 
@@ -42,15 +44,24 @@ class RAGModel:
         return [TextLoader(item).load() for item in files]  
     
     
+    def local_read_zip(self, zip_file_path: str):
+        with zipfile.ZipFile(zip_file_path) as zf:
+            extracted_files = zf
+        print(zip_file_path)
+        return self
+    
     def local_read_dir(self, directory: str):
-        local_repo = os.walk(directory)
-        file_list: str = {}
-        result = []
-        for folder_triple in local_repo:
-            file_rel_path, _, files = folder_triple
-            file_list = [file_rel_path + "/" + item for item in files]
-            result += self._local_read_dir(file_list)
-        self._documents = result
+        try:
+            local_repo = os.walk(directory)
+            file_list: str = {}
+            result = []
+            for folder_triple in local_repo:
+                file_rel_path, _, files = folder_triple
+                file_list = [file_rel_path + "/" + item for item in files]
+                result += self._local_read_dir(file_list)
+            self._documents = result
+        except Exception as e:
+            raise ValueError(f"Fail to read direction due ot {e}")
         return self
     
     
