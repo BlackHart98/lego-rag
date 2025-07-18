@@ -45,6 +45,13 @@ class AIModel:
                 raise ValueError("Unsupported model id")
 
 
+class FileType:
+    NIL = ""
+    MARKDOWN = ".md"
+    TEXT = ".txt"
+    PDF = ".pdf"
+
+
 class QueryStrategy(IntEnum):
     BASIC_STRATEGY: int = 1
     STEP_BACK_STRATEGY: int = 2

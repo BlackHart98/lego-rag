@@ -4,7 +4,9 @@ import typing as t
 
 from core import RAGModel, Questionnaire
 from utils import QueryStrategy        
-    
+
+
+# I should use pathlib to handle paths 
 async def main(argv: t.List[str]) -> int:
     query: t.List[str] = Questionnaire(
         query="what is my core algorithm?", 

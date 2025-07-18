@@ -4,14 +4,14 @@ import typing as t
 from pydantic import BaseModel
 from config import vector_store
 
- 
+import zipfile 
 import chromadb
 from langchain_core.documents import Document
 from langchain_community.document_loaders.text import TextLoader
-from langchain_text_splitters.character import RecursiveCharacterTextSplitter
+from langchain_text_splitters.character import RecursiveCharacterTextSplitter, TextSplitter
 
-import zipfile
-from utils import QueryStrategy
+from utils import QueryStrategy, FileType
+import pathlib as p
 
 
 class RAGModel:
@@ -20,7 +20,7 @@ class RAGModel:
     def __init__(
         self, 
         model_id:str="sample_collection",
-        text_spliter:TextLoader=RecursiveCharacterTextSplitter(
+        text_spliter:TextSplitter=RecursiveCharacterTextSplitter(
             chunk_size=200, 
             chunk_overlap=0),
         vector_store=vector_store,
@@ -32,8 +32,9 @@ class RAGModel:
     def _local_read_dir(
         self,
         files: t.Set[str],
+        fn = lambda x: True
     ) -> t.List[Document | None]:
-        return [TextLoader(item).load() for item in files]  
+        return [_load_file(item)() for item in files if fn(item)]  
     
     
     def local_read_zip(self, zip_file_path: str):
@@ -56,7 +57,6 @@ class RAGModel:
             raise ValueError(f"Fail to read direction due ot {e}")
         return self
     
-    
     def split_documents(self):
         result = []
         for item in self._documents:
@@ -64,7 +64,6 @@ class RAGModel:
         self._documents_splits = result
         return self
     
-
     def store_embedding(self, id_prefix="id"):
         self._collection.upsert(
             documents=[item.page_content for item in self._documents_splits],
@@ -92,6 +91,15 @@ class Questionnaire(BaseModel):
                 self.query_splits = [self.query]
                 return self
     
-    
     def get_query_splits(self) -> t.List[str]:
         return self.query_splits
+
+
+
+def _load_file(file_: str, **kwargs) -> t.Callable[..., t.List[Document]]:
+    file_extension = p.Path(file_).suffix
+    match file_extension:
+        case FileType.MARKDOWN | FileType.TEXT | FileType.NIL:
+            return TextLoader(file_).load
+        case _:
+            raise NotImplementedError(f"File type `{file_}` not supported.")
