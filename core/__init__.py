@@ -12,14 +12,7 @@ from langchain_text_splitters.character import RecursiveCharacterTextSplitter, T
 from enum import IntEnum
 
 import pathlib as p
-
-
-
-class FileType:
-    NIL = ""
-    MARKDOWN = ".md"
-    TEXT = ".txt"
-    PDF = ".pdf"
+from utils import _load_file
 
 
 class QueryStrategy(IntEnum):
@@ -109,13 +102,3 @@ class Questionnaire(BaseModel):
     
     def get_query_splits(self) -> t.List[str]:
         return self.query_splits
-
-
-
-def _load_file(file_: str, **kwargs) -> t.List[Document]:
-    file_extension = p.Path(file_).suffix
-    match file_extension:
-        case FileType.MARKDOWN | FileType.TEXT | FileType.NIL:
-            return TextLoader(file_).load()
-        case _:
-            raise NotImplementedError(f"File type `{file_}` not supported.")
