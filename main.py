@@ -3,10 +3,13 @@ import asyncio
 import typing as t
 
 from core import RAGModel, Questionnaire
-        
+from utils import QueryStrategy        
     
 async def main(argv: t.List[str]) -> int:
-    query = Questionnaire(query="what is my core algorithm?").\
+    query: Questionnaire = Questionnaire(
+        query="what is my core algorithm?", 
+        query_strategy=QueryStrategy.STEP_BACK_STRATEGY, 
+        query_split_count=1).\
         generate_retrival_query().\
             get_query_splits()
     
@@ -16,7 +19,6 @@ async def main(argv: t.List[str]) -> int:
                 store_embedding().\
                     query_collection(query_texts=query, n_results=1,)
     print(query_result)
-    
     return 0
 
 
