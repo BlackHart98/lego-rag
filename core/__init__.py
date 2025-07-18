@@ -34,7 +34,7 @@ class RAGModel:
         files: t.Set[str],
         fn = lambda x: True
     ) -> t.List[Document | None]:
-        return [_load_file(item)() for item in files if fn(item)]  
+        return [_load_file(item) for item in files if fn(item)]  
     
     
     def local_read_zip(self, zip_file_path: str):
@@ -96,10 +96,10 @@ class Questionnaire(BaseModel):
 
 
 
-def _load_file(file_: str, **kwargs) -> t.Callable[..., t.List[Document]]:
+def _load_file(file_: str, **kwargs) -> t.List[Document]:
     file_extension = p.Path(file_).suffix
     match file_extension:
         case FileType.MARKDOWN | FileType.TEXT | FileType.NIL:
-            return TextLoader(file_).load
+            return TextLoader(file_).load()
         case _:
             raise NotImplementedError(f"File type `{file_}` not supported.")
