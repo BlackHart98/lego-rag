@@ -1,6 +1,7 @@
 import typing as t
 from dotenv import load_dotenv, find_dotenv
 from dataclasses import dataclass
+from enum import IntEnum
 
 
 @dataclass
@@ -42,4 +43,10 @@ class AIModel:
                  self.model = MistralModel
             case _:
                 raise ValueError("Unsupported model id")
-                
+
+
+class QueryStrategy(IntEnum):
+    BASIC_STRATEGY: int = 1
+    STEP_BACK_STRATEGY: int = 2
+    REPHRASE_STRATEGY: int = 3
+    

@@ -20,6 +20,7 @@ from langchain_community.document_loaders.text import TextLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter
 
 import zipfile
+from utils import QueryStrategy
 
 
 class RAGModel:
@@ -87,6 +88,29 @@ class RAGModel:
  
 def filter_threshold(c: chromadb.QueryResult, threshold: float=0.7) -> chromadb.QueryResult:
     return c
+
+
+class Questionaire(BaseModel):
+    query: str
+    query_strategy: QueryStrategy = QueryStrategy.BASIC_STRATEGY
+    query_split_count: int = 0
+    query_splits: t.List[str] = []
+    
+    def generate_retrival_query(self) -> t.List[str]:
+        match self.query_strategy:
+            case QueryStrategy.BASIC_STRATEGY:
+                self.query_splits = [self.query]
+                return self
+            case _:
+                self.query_splits = [self.query]
+                return self
+    
+    
+    def get_query_splits(self) -> t.List[str]:
+        return self.query_splits
+        
+
+
     
 async def main(argv: t.List[str]) -> int:
     query_result: RAGModel = RAGModel().\
@@ -94,8 +118,12 @@ async def main(argv: t.List[str]) -> int:
             split_documents().\
                 store_embedding().\
                     query_collection(query_texts=["what is my core algorithm?",], n_results=1,)
-
     print(query_result)
+    
+    sample_questionaire = Questionaire(query="what is my core algorithm?").\
+        generate_retrival_query().\
+            get_query_splits()
+    print(sample_questionaire)
     return 0
 
 
