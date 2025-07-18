@@ -2,8 +2,7 @@ import sys
 import asyncio
 import typing as t
 
-from core import RAGModel, Questionnaire
-from utils import QueryStrategy        
+from core import RAGModel, Questionnaire, QueryStrategy        
 
 
 # I should use pathlib to handle paths 

@@ -9,9 +9,25 @@ import chromadb
 from langchain_core.documents import Document
 from langchain_community.document_loaders.text import TextLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter, TextSplitter
+from enum import IntEnum
 
-from utils import QueryStrategy, FileType
 import pathlib as p
+
+
+
+class FileType:
+    NIL = ""
+    MARKDOWN = ".md"
+    TEXT = ".txt"
+    PDF = ".pdf"
+
+
+class QueryStrategy(IntEnum):
+    BASIC_STRATEGY: int = 1
+    STEP_BACK_STRATEGY: int = 2
+    REPHRASE_STRATEGY: int = 3
+    SEGMENTATION_STRATEGY: int = 4
+    
 
 
 class RAGModel:
