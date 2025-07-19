@@ -10,6 +10,9 @@ load_dotenv(dotenv_path=DOT_ENV_PATH, override=True)
 
 class Config:
     MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY")
+    DEFAULT_RETRY_COUNT = 1
+    DEFAULT_DELAY_SECONDS = 2.0
+    DEFAULT_LAG_MAX_SECONDS = 0.5
     
     
 vector_store = chromadb.Client()

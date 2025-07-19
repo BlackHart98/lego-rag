@@ -2,7 +2,7 @@ import os
 import sys
 import typing as t
 from pydantic import BaseModel
-from config import vector_store
+from config import vector_store, Config
 
 import zipfile 
 import chromadb
@@ -10,11 +10,14 @@ from langchain_core.documents import Document
 from langchain_community.document_loaders.text import TextLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter, TextSplitter
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
 from enum import IntEnum
+from jinja2 import Environment, FileSystemLoader, Template
 
 import pathlib as p
-from utils import _load_file
+from utils import _load_file, get_asym_sleep_time
 import logging
+import asyncio
 
 
 Metadata: t.TypeAlias = t.Mapping[str, t.Optional[t.Union[str, int, float, bool]]]
@@ -156,7 +159,7 @@ class Questionnaire(BaseModel):
 class Aggregator:  
     _threshold: float | None = None
     
-    def __init__(self, query_results: chromadb.QueryResult, threshold: float | None=None):
+    def __init__(self, query_results: chromadb.QueryResult, threshold: float | None=.5):
         self._query_results = query_results
         self._threshold = threshold
         
@@ -191,18 +194,34 @@ class ResponseGenerator:
     _llm: BaseChatModel | None = None
     def __init__(
         self, 
+        query:t.List[str],
         llm: BaseChatModel | None = None, 
-        response_template:str="../prompt_templates/response.txt"
+        role_template_file:str="prompt_templates/rag_role.txt",
+        response_template_file:str="prompt_templates/response.txt",
     ):
         self._llm = llm
-        self._response_template = response_template
+        self._query = query
+        try:
+            with open(p.Path(response_template_file).absolute(), "r") as f, open(p.Path(role_template_file).absolute(), "r") as rf:
+                content = f.read()
+                role_content = rf.read()
+                f.close(); rf.close()
+            role_template = Template(role_content)
+            self._system_role = ("system", role_template.render({}))
+            self._response_template = Template(content)
+        except Exception as e:
+            raise ValueError(f"Failed to initialize `ResponseGenerator` object due to {e}")
+        
         
 
-    def generate_response(
+    async def generate_response(
         self, 
         aggregate_result: t.List[AggregatedQueryResult],
         model_id: str=None, 
-        fallback_response: str="I don't know."
+        fallback_response: str="I don't know.",
+        retry:int=Config.DEFAULT_RETRY_COUNT,
+        base_delay:float=Config.DEFAULT_DELAY_SECONDS,
+        lag_max:float=Config.DEFAULT_LAG_MAX_SECONDS,
     ) -> QueryResponse:
         if self._llm:
             if len(aggregate_result) <= 0:
@@ -212,11 +231,33 @@ class ResponseGenerator:
                     citations=None
                 )
             else:
-                # todo: continue this...
+                content_list = [{"page_content" : item.document} for item in aggregate_result]
+                citations = {"citations": content_list, "queries" : [{"query" : item} for item in self._query]}
+                body = self._response_template.render(citations)
+                print(body)
+                prompt_template = ChatPromptTemplate.from_messages([
+                    self._system_role,
+                    ("user", "{body}")
+                ])
+                prompt = prompt_template.format(body=body)
+                for i in range(retry + 1):
+                    try:
+                        response = await self._llm.ainvoke(prompt)
+                        return QueryResponse(
+                            model_id=model_id,
+                            query_response=response.content,
+                            citations=aggregate_result,
+                        )
+                    except Exception as e:
+                        logging.error(f"Failed to summarize answer due to {e}.")
+                        if retry <= i: break
+                        sleep_time = get_asym_sleep_time(i + 1, base_delay, lag_max)  
+                        logging.error(f"Sleeping for {sleep_time:.2f}s before retrying…")
+                        await asyncio.sleep(sleep_time)                        
                 return QueryResponse(
                     model_id=model_id,
                     query_response=fallback_response,
-                    citations=None
+                    citations=None,
                 )
         else:
             raise ValueError("No chat model specified.")

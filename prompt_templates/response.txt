@@ -1,0 +1,21 @@
+Context(s):
+{% for source in citations %}
+{{source.page_content}}
+
+---
+{% endfor %}
+
+Question(s):
+{% if queries|length == 1%}
+{% for q in queries %}
+{{q.query}}
+
+___
+{% endfor %}
+{% else %}
+{% for q in queries %}
+rephrases #: {{q.query}} 
+
+---
+{% endfor %}
+{% endif %}

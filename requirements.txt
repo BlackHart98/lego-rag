@@ -35,6 +35,7 @@ humanfriendly==10.0
 idna==3.10
 importlib_metadata==8.7.0
 importlib_resources==6.5.2
+Jinja2==3.1.6
 jsonpatch==1.33
 jsonpointer==3.0.0
 jsonschema==4.24.0
@@ -47,6 +48,7 @@ langchain-mistralai==0.2.11
 langchain-text-splitters==0.3.8
 langsmith==0.4.6
 markdown-it-py==3.0.0
+MarkupSafe==3.0.2
 marshmallow==3.26.1
 mdurl==0.1.2
 mmh3==5.1.0

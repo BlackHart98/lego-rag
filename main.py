@@ -11,6 +11,7 @@ from core import (
     AggregatedQueryResult,
     ResponseGenerator)        
 from langchain_mistralai import ChatMistralAI
+from jinja2 import Environment, FileSystemLoader, Template
 
 
 # I should use pathlib to handle paths 
@@ -20,22 +21,16 @@ async def main(argv: t.List[str]) -> int:
             split_documents().\
                 store_embedding()
                 
-    query: t.List[str] = Questionnaire(
-        query="what is my core algorithm?", 
-        query_strategy=QueryStrategy.NO_STRATEGY, 
-        query_split_count=1,).\
+    query: t.List[str] = Questionnaire(query="what is my core algorithm?",).\
         generate_retrival_query().\
             get_query_splits()
             
-    query_result = my_sample_collection.query_collection(
-        query_texts=query, 
-        n_results=2, 
-        routing_to_namespace=True,)
+    query_result = my_sample_collection.query_collection(query_texts=query, n_results=2,)
     
-    result : t.List[AggregatedQueryResult] = Aggregator(query_result, threshold=.5).merge_query_results()
-    print(result)
+    result : t.List[AggregatedQueryResult] = Aggregator(query_result).merge_query_results()
     
-    response = ResponseGenerator(
+    response = await ResponseGenerator(
+        query,
         llm=ChatMistralAI(
             model="mistral-large-latest", 
             mistral_api_key=os.getenv("MISTRAL_API_KEY"), 
@@ -44,6 +39,7 @@ async def main(argv: t.List[str]) -> int:
     ).generate_response(result)
     
     print(response.query_response)
+    print(response.citations)
     
     return 0
 
