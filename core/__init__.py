@@ -16,6 +16,8 @@ from utils import _load_file
 import logging
 
 
+Metadata: t.TypeAlias = t.Mapping[str, t.Optional[t.Union[str, int, float, bool]]]
+
 class QueryStrategy(IntEnum):
     NO_STRATEGY: int = 1
     REPHRASE_STRATEGY: int = 2
@@ -23,12 +25,21 @@ class QueryStrategy(IntEnum):
     
 
 
+class AggregatedQueryResult(BaseModel):
+    id : str
+    cos_distance: float # range 0 to 2
+    cos_similarity: float # range -1 to 1
+    document: str
+    metadata: Metadata
+
+
+
 class RAGModel:
     _documents: t.List[t.List[Document]] 
     _documents_splits: t.List[Document]
     def __init__(
         self, 
-        model_id:str="sample_collection",
+        namespace:str="sample_collection",
         text_spliter:TextSplitter=RecursiveCharacterTextSplitter(
             chunk_size=200, 
             chunk_overlap=0),
@@ -36,7 +47,7 @@ class RAGModel:
     ):
         self._text_split = text_spliter
         self._collection = vector_store.get_or_create_collection(
-            name=model_id,
+            name=namespace,
             metadata={"hnsw:space": "cosine"},
             )
     
@@ -84,10 +95,17 @@ class RAGModel:
         )
         return self
         
-    def query_collection(self, **kwargs) -> chromadb.QueryResult:
+    def query_collection(self, routing_to_namespace: bool=False, **kwargs) -> chromadb.QueryResult:
+        if "query_texts" in kwargs and routing_to_namespace:
+            kwargs["query_texts"] = kwargs["query_texts"]
         return self._collection.query(**kwargs)
     
     
+    def route_queery_to_namespace(self, query_text: str) -> str:
+        raise NotImplementedError()  
+
+
+
 class Questionnaire(BaseModel):
     query: str
     query_strategy: QueryStrategy = QueryStrategy.NO_STRATEGY
@@ -127,21 +145,36 @@ class Questionnaire(BaseModel):
         return self.query_splits
 
 
-class Aggregator:
-    _query_results = []  
-    _top_k: int | None = None
+
+class Aggregator:  
+    _threshold: float | None = None
     
-    def __init__(self, query_results: t.List[chromadb.QueryResult], top_k:int | None=None):
+    def __init__(self, query_results: chromadb.QueryResult, threshold: float | None=None):
         self._query_results = query_results
-        self._top_k = top_k
+        self._threshold = threshold
         
-    def merge_query_results(self) -> chromadb.QueryResult:
-        if self._top_k:
-            for q in self._query_results:
-                print(q)
+    def merge_query_results(self) -> t.List[AggregatedQueryResult]:
+        result: t.List[AggregatedQueryResult] = []
+        n_for_queries = len(self._query_results["ids"])
+        if not (self._query_results["documents"]) or n_for_queries <= 0 or not(self._query_results["metadatas"]):
+            return []
         else:
-            pass
+            for idx in range(n_for_queries):
+                n_for_results = len(self._query_results["ids"][idx])
+                if n_for_results <= 0:
+                    break
+                else:
+                    for jdx in range(n_for_results):
+                        result += [AggregatedQueryResult(
+                            id=self._query_results["ids"][idx][jdx], 
+                            cos_distance=self._query_results["distances"][idx][jdx] if self._query_results["distances"] else 0,
+                            cos_similarity=(1 - self._query_results["distances"][idx][jdx]) if self._query_results["distances"] else 1,
+                            document=self._query_results["documents"][idx][jdx],
+                            metadata=self._query_results["metadatas"][idx][jdx],)]
+            if self._threshold:
+                return [item for item in result if item.cos_similarity >= self._threshold]
+            else:
+                return result
     
-    def _merge_query_result(self, query_result: chromadb.QueryResult) -> chromadb.QueryResult:
-        # create a faux mapping between  the {array_index}_id_{idx} and the distance
-        pass
+    def _deduplicate_result(self, result: t.List[AggregatedQueryResult]) -> t.List[AggregatedQueryResult]:
+        raise NotImplementedError()  
