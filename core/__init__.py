@@ -9,6 +9,7 @@ import chromadb
 from langchain_core.documents import Document
 from langchain_community.document_loaders.text import TextLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter, TextSplitter
+from langchain_core.language_models.chat_models import BaseChatModel
 from enum import IntEnum
 
 import pathlib as p
@@ -31,6 +32,12 @@ class AggregatedQueryResult(BaseModel):
     cos_similarity: float # range -1 to 1
     document: str
     metadata: Metadata
+    
+
+class QueryResponse(BaseModel):
+    model_id : str | None
+    query_response: str
+    citations: t.List[AggregatedQueryResult] | None
 
 
 
@@ -178,3 +185,38 @@ class Aggregator:
     
     def _deduplicate_result(self, result: t.List[AggregatedQueryResult]) -> t.List[AggregatedQueryResult]:
         raise NotImplementedError()  
+    
+    
+class ResponseGenerator:
+    _llm: BaseChatModel | None = None
+    def __init__(
+        self, 
+        llm: BaseChatModel | None = None, 
+        response_template:str="../prompt_templates/response.txt"
+    ):
+        self._llm = llm
+        self._response_template = response_template
+        
+
+    def generate_response(
+        self, 
+        aggregate_result: t.List[AggregatedQueryResult],
+        model_id: str=None, 
+        fallback_response: str="I don't know."
+    ) -> QueryResponse:
+        if self._llm:
+            if len(aggregate_result) <= 0:
+                return QueryResponse(
+                    model_id=model_id,
+                    query_response=fallback_response,
+                    citations=None
+                )
+            else:
+                # todo: continue this...
+                return QueryResponse(
+                    model_id=model_id,
+                    query_response=fallback_response,
+                    citations=None
+                )
+        else:
+            raise ValueError("No chat model specified.")
