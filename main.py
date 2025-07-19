@@ -9,16 +9,16 @@ from core import RAGModel, Questionnaire, QueryStrategy
 async def main(argv: t.List[str]) -> int:
     query: t.List[str] = Questionnaire(
         query="what is my core algorithm?", 
-        query_strategy=QueryStrategy.STEP_BACK_STRATEGY, 
-        query_split_count=1).\
+        query_strategy=QueryStrategy.REPHRASE_STRATEGY, 
+        query_split_count=1,).\
         generate_retrival_query().\
             get_query_splits()
-    
+            
     query_result = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
                 store_embedding().\
-                    query_collection(query_texts=query, n_results=1,)
+                    query_collection(query_texts=query, n_results=2,)
     print(query_result)
     return 0
 
