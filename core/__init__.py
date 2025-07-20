@@ -19,8 +19,11 @@ from utils import _load_file, get_asym_sleep_time
 import logging
 import asyncio
 
+from chromadb import Collection
+
 
 Metadata: t.TypeAlias = t.Mapping[str, t.Optional[t.Union[str, int, float, bool]]]
+T = t.TypeVar('T')
 
 class QueryStrategy(IntEnum):
     NO_STRATEGY: int = 1
@@ -49,17 +52,13 @@ class RAGModel:
     _documents_splits: t.List[Document]
     def __init__(
         self, 
-        namespace:str="sample_collection",
         text_spliter:TextSplitter=RecursiveCharacterTextSplitter(
             chunk_size=200, 
             chunk_overlap=0),
         vector_store=vector_store,
     ):
         self._text_split = text_spliter
-        self._collection = vector_store.get_or_create_collection(
-            name=namespace,
-            metadata={"hnsw:space": "cosine"},
-            )
+        self._collections: Collection = {}
     
     
     def _local_read_dir(
@@ -69,16 +68,21 @@ class RAGModel:
     ) -> t.List[Document | None]:
         return [_load_file(item) for item in files if fn(item)]  
     
-    
     def local_read_zip(self, zip_file_path: str):
         with zipfile.ZipFile(zip_file_path) as zf:
             extracted_files = zf
         print(zip_file_path)
         return self
-    
+   
+    def remote_read_dir(self,):
+        return self
+
+    def read_webpage(self,):
+        return self
+
     def local_read_dir(self, directory: str):
         try:
-            local_repo = os.walk(directory)
+            local_repo = os.walk(p.Path(directory).absolute())
             file_list: str = {}
             result = []
             for folder_triple in local_repo:
@@ -97,22 +101,32 @@ class RAGModel:
         self._documents_splits = result
         return self
     
-    def store_embedding(self, id_prefix="id"):
-        self._collection.upsert(
+    def store_embedding(self, namespace: str="sample_collection", id_prefix="id"):
+        collection = vector_store.get_or_create_collection(
+            name=namespace,
+            metadata={"hnsw:space": "cosine"},)
+        self._collection = collection.upsert(
             documents=[item.page_content for item in self._documents_splits],
             ids=[f"{id_prefix}_{idx}" for idx, _ in enumerate(self._documents_splits)],
             metadatas=[item.metadata for item in self._documents_splits]
         )
+        self._collections[namespace] = collection
         return self
+    
+    def cluster_embeddings(
+        self,
+        namespaces:t.List[str] | None=[], 
+        clustering_fn: t.Callable[..., t.Dict[str, T]] | None=None
+    ):
+        raise ValueError("The function is not yet implemented") 
         
-    def query_collection(self, routing_to_namespace: bool=False, **kwargs) -> chromadb.QueryResult:
+    def query_collection(self, routing_to_namespace: bool=False, **kwargs) -> t.List[chromadb.QueryResult]:
         if "query_texts" in kwargs and routing_to_namespace:
             kwargs["query_texts"] = kwargs["query_texts"]
-        return self._collection.query(**kwargs)
+        return [self._collections[namespace].query(**kwargs) for namespace in self._collections]
     
-    
-    def route_queery_to_namespace(self, query_text: str) -> str:
-        raise NotImplementedError()  
+    def route_query_to_namespace(self, query_text: str) -> str:
+        raise ValueError("The function is not yet implemented")   
 
 
 
@@ -159,28 +173,33 @@ class Questionnaire(BaseModel):
 class Aggregator:  
     _threshold: float | None = None
     
-    def __init__(self, query_results: chromadb.QueryResult, threshold: float | None=.5):
+    def __init__(self, query_results: t.List[chromadb.QueryResult], threshold: float | None=.5):
         self._query_results = query_results
         self._threshold = threshold
         
     def merge_query_results(self) -> t.List[AggregatedQueryResult]:
+        nested_query_result: t.List[t.List[AggregatedQueryResult]] = [self._merge_query_result(item) for item in self._query_results]
+        flattened_query_results = [x for item in nested_query_result for x in item]
+        return flattened_query_results
+    
+    def _merge_query_result(self, query_result) -> t.List[AggregatedQueryResult]:
         result: t.List[AggregatedQueryResult] = []
-        n_for_queries = len(self._query_results["ids"])
-        if not (self._query_results["documents"]) or n_for_queries <= 0 or not(self._query_results["metadatas"]):
+        n_for_queries = len(query_result["ids"])
+        if not (query_result["documents"]) or n_for_queries <= 0 or not(query_result["metadatas"]):
             return []
         else:
             for idx in range(n_for_queries):
-                n_for_results = len(self._query_results["ids"][idx])
+                n_for_results = len(query_result["ids"][idx])
                 if n_for_results <= 0:
                     break
                 else:
                     for jdx in range(n_for_results):
                         result += [AggregatedQueryResult(
-                            id=self._query_results["ids"][idx][jdx], 
-                            cos_distance=self._query_results["distances"][idx][jdx] if self._query_results["distances"] else 0,
-                            cos_similarity=(1 - self._query_results["distances"][idx][jdx]) if self._query_results["distances"] else 1,
-                            document=self._query_results["documents"][idx][jdx],
-                            metadata=self._query_results["metadatas"][idx][jdx],)]
+                            id=query_result["ids"][idx][jdx], 
+                            cos_distance=query_result["distances"][idx][jdx] if query_result["distances"] else 0,
+                            cos_similarity=(1 - query_result["distances"][idx][jdx]) if query_result["distances"] else 1,
+                            document=query_result["documents"][idx][jdx],
+                            metadata=query_result["metadatas"][idx][jdx],)]
             if self._threshold:
                 return [item for item in result if item.cos_similarity >= self._threshold]
             else:
@@ -212,8 +231,6 @@ class ResponseGenerator:
         except Exception as e:
             raise ValueError(f"Failed to initialize `ResponseGenerator` object due to {e}")
         
-        
-
     async def generate_response(
         self, 
         aggregate_result: t.List[AggregatedQueryResult],

@@ -14,5 +14,5 @@ class Config:
     DEFAULT_DELAY_SECONDS = 2.0
     DEFAULT_LAG_MAX_SECONDS = 0.5
     
-    
+# I need to change this to make this such that I can easily switch between the different chromadb mode    
 vector_store = chromadb.Client()

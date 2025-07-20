@@ -6,20 +6,17 @@ import typing as t
 from core import (
     RAGModel, 
     Questionnaire, 
-    QueryStrategy, 
     Aggregator, 
     AggregatedQueryResult,
     ResponseGenerator)        
 from langchain_mistralai import ChatMistralAI
-from jinja2 import Environment, FileSystemLoader, Template
 
-
-# I should use pathlib to handle paths 
+ 
 async def main(argv: t.List[str]) -> int:
     my_sample_collection = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
-                store_embedding()
+                store_embedding(namespace="my_collection")
                 
     query: t.List[str] = Questionnaire(query="what is my core algorithm?",).\
         generate_retrival_query().\
