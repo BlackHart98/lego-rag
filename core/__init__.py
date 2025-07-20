@@ -57,9 +57,12 @@ class RAGModel:
             chunk_size=200, 
             chunk_overlap=0),
         vector_store=vector_store,
+        llm: BaseChatModel | None = None,
     ):
         self._text_split = text_spliter
         self._collections: Collection = {}
+        self._llm = llm
+        self._vector_store = vector_store
     
     
     def _local_read_dir(
@@ -103,7 +106,7 @@ class RAGModel:
         return self
     
     def store_embedding(self, namespace: str="sample_collection", id_prefix="id"):
-        collection = vector_store.get_or_create_collection(
+        collection = self._vector_store.get_or_create_collection(
             name=namespace,
             metadata={"hnsw:space": "cosine"},)
         self._collection = collection.upsert(
@@ -119,15 +122,69 @@ class RAGModel:
         namespaces:t.List[str] | None=[], 
         clustering_fn: t.Callable[..., t.Dict[str, T]] | None=None
     ):
-        raise ValueError("The function is not yet implemented") 
+        raise ValueError("The function is not yet implemented.") 
         
-    def query_collection(self, routing_to_namespace: bool=False, **kwargs) -> t.List[chromadb.QueryResult]:
-        if "query_texts" in kwargs and routing_to_namespace:
+    def query_collection(self, route_to_namespace:bool=False, **kwargs) -> t.List[chromadb.QueryResult]:
+        if "query_texts" in kwargs and route_to_namespace:
+            _ = self.route_query_to_namespace(kwargs["query_texts"][0])
             kwargs["query_texts"] = kwargs["query_texts"]
         return [self._collections[namespace].query(**kwargs) for namespace in self._collections]
     
-    def route_query_to_namespace(self, query_text: str) -> str:
-        raise ValueError("The function is not yet implemented")   
+    # For the is to work well you have to use appropriate name for the collections
+    def route_query_to_namespace(
+        self, 
+        query_text: str, 
+        query_rewrite_file:str="prompt_templates/query_rewrite.txt",
+        route_prompt_file:str="prompt_templates/namespace_routing.txt",
+        retry:int=Config.DEFAULT_RETRY_COUNT,
+        base_delay:float=Config.DEFAULT_DELAY_SECONDS,
+        lag_max:float=Config.DEFAULT_LAG_MAX_SECONDS,
+    ) -> t.Any:
+        logging.warning("This method is not well implemented yet, hence might not work well.")
+        if self._llm:
+            namespace_list = [{"namespace" : item} for item in self._collections]
+            print(namespace_list)
+            try:
+                with open(p.Path(route_prompt_file).absolute(), "r") as f, open(p.Path(query_rewrite_file).absolute(), "r") as qf:
+                    content = f.read()
+                    rewrite_content = qf.read()
+                    f.close(); qf.close()
+                route_template = Template(content)
+                # There is definitely a better way to do this, using | (langchain chain expression)
+                system_role = ("system", rewrite_content.render({}))
+                
+                prompt_template = ChatPromptTemplate.from_messages([
+                    system_role,
+                    ("user", "{query_text}")
+                ])
+                cleaned_query = asyncio.run(
+                    get_model_response(
+                        prompt, 
+                        None, 
+                        self._llm.ainvoke, 
+                        retry, 
+                        base_delay, 
+                        lag_max))
+                body = route_template.render({"namespaces" : namespace_list, "query" : cleaned_query.content})
+                prompt_template = ChatPromptTemplate.from_messages([
+                    ("user", "{body}")
+                ])
+                prompt = prompt_template.format(body=body)
+                response = asyncio.run(
+                    get_model_response(
+                        prompt, 
+                        None, 
+                        self._llm.ainvoke, 
+                        retry, 
+                        base_delay, 
+                        lag_max))
+                return response.content
+            except Exception as e:
+                logging.error(f"Failed to route queries due to {e}")
+                return  query_text
+        else:
+            logging.error("No LLM model specified.")
+            return query_text
 
 
 
@@ -140,7 +197,7 @@ class Questionnaire(BaseModel):
     # I need to look for a better abstraction
     def generate_retrival_query(
         self, 
-        rephrase_template:str | None="../prompt_templates/rephrase.txt",
+        rephrase_template:str | None="prompt_templates/rephrase.txt",
     ):
         match self.query_strategy:
             case QueryStrategy.NO_STRATEGY:
@@ -252,30 +309,44 @@ class ResponseGenerator:
                 content_list = [{"page_content" : item.document} for item in aggregate_result]
                 citations = {"citations": content_list, "queries" : [{"query" : item} for item in self._query]}
                 body = self._response_template.render(citations)
-                print(body)
+                # print(body)
                 prompt_template = ChatPromptTemplate.from_messages([
                     self._system_role,
                     ("user", "{body}")
                 ])
                 prompt = prompt_template.format(body=body)
-                for i in range(retry + 1):
-                    try:
-                        response = await self._llm.ainvoke(prompt)
-                        return QueryResponse(
-                            model_id=model_id,
-                            query_response=response.content,
-                            citations=aggregate_result,
-                        )
-                    except Exception as e:
-                        logging.error(f"Failed to summarize answer due to {e}.")
-                        if retry <= i: break
-                        sleep_time = get_asym_sleep_time(i + 1, base_delay, lag_max)  
-                        logging.error(f"Sleeping for {sleep_time:.2f}s before retrying…")
-                        await asyncio.sleep(sleep_time)                        
+                response = await get_model_response(
+                    prompt, 
+                    model_id, 
+                    self._llm.ainvoke, 
+                    retry, 
+                    base_delay, 
+                    lag_max)
                 return QueryResponse(
                     model_id=model_id,
-                    query_response=fallback_response,
-                    citations=None,
+                    query_response=response.content if response else fallback_response,
+                    citations=aggregate_result if response else None,
                 )
         else:
             raise ValueError("No chat model specified.")
+
+
+
+async def get_model_response(
+    prompt: str, 
+    model_id: str | None, 
+    invoke_fn, retry: int, 
+    base_delay: float, 
+    lag_max: float
+) -> t.Any | None:
+    for i in range(retry + 1):
+        try:
+            response = await invoke_fn(prompt)
+            return response
+        except Exception as e:
+            logging.error(f"Failed to reach model {model_id} due to {e}.")
+            if retry <= i: break
+            sleep_time = get_asym_sleep_time(i + 1, base_delay, lag_max)  
+            logging.error(f"Sleeping for {sleep_time:.2f}s before retrying…")
+            await asyncio.sleep(sleep_time)                        
+    return None

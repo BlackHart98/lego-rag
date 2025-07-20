@@ -1,8 +1,11 @@
-Step1: Identify what the question is about.
-Step2: Choose only the most relevant namespaces.
-Step3: Return final result in //boxed{}.
+Question:
+{{query}}
 
-Namespaces:
+Available Namespace(s):
 {% for n in namespaces %}
 {{n.namespace}}
 {% endfor %}
+
+Step1: Identify what the question is about.
+Step2: Choose only the most relevant namespaces.
+Step3: Return final result in //boxed{}.

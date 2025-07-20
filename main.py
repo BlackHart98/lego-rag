@@ -13,7 +13,7 @@ from langchain_mistralai import ChatMistralAI
 
  
 async def main(argv: t.List[str]) -> int:
-    my_sample_collection = RAGModel().\
+    rag_model = RAGModel().\
         local_read_dir("local_repo").\
             split_documents().\
                 store_embedding(namespace="my_collection")
@@ -21,10 +21,12 @@ async def main(argv: t.List[str]) -> int:
     query: t.List[str] = Questionnaire(query="what is my core algorithm?",).\
         generate_retrival_query().\
             get_query_splits()
-            
-    query_result = my_sample_collection.query_collection(query_texts=query, n_results=2,)
     
-    result : t.List[AggregatedQueryResult] = Aggregator(query_result).merge_query_results()
+    result: t.List[AggregatedQueryResult] = Aggregator(
+        rag_model.query_collection(
+            query_texts=query, 
+            n_results=2,)
+        ).merge_query_results()
     
     response = await ResponseGenerator(
         query,
