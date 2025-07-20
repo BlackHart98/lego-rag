@@ -1,5 +1,5 @@
 # lego-rag
-*A very simple RAG scaffolding*
+*A very simple RAG scaffold*
 
 ## Prerequisites
 1. Install Python3 (python 3.11+ preferably)
