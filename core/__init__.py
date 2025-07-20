@@ -50,6 +50,7 @@ class QueryResponse(BaseModel):
 class RAGModel:
     _documents: t.List[t.List[Document]] 
     _documents_splits: t.List[Document]
+    
     def __init__(
         self, 
         text_spliter:TextSplitter=RecursiveCharacterTextSplitter(
