@@ -95,7 +95,7 @@ class RAGModel:
                 result += self._local_read_dir(file_list)
             self._documents = result
         except Exception as e:
-            raise ValueError(f"Fail to read direction due ot {e}")
+            raise ValueError(f"Fail to read directory due ot {e}")
         return self
     
     def split_documents(self):
